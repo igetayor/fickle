@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fickle | High-Throughput Concurrent WebSocket Server</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="navbar">
+    <div class="nav-brand">
+      <div class="brand-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">Fickle</span>
+        <span class="brand-tag">Go WebSocket Hub</span>
+      </div>
+    </div>
+
+    <!-- Cluster & Connection Status Badges -->
+    <div class="nav-status">
+      <div class="status-item" id="nodeBadge">
+        <span class="dot yellow"></span>
+        <span class="status-text">Node: <strong id="nodeId">detecting...</strong></span>
+      </div>
+      <div class="status-item" id="redisBadge">
+        <span class="dot" id="redisDot"></span>
+        <span class="status-text">Redis: <strong id="redisStatus">checking</strong></span>
+      </div>
+      <div class="status-item" id="connBadge">
+        <span class="dot red" id="connDot"></span>
+        <span class="status-text" id="connStatus">Disconnected</span>
+      </div>
+      <button id="btnToggleConnect" class="btn btn-primary btn-sm">Connect</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+    <!-- Top Telemetry Ribbon -->
+    <div class="telemetry-ribbon">
+      <div class="metric-card">
+        <div class="metric-label">Active Connections</div>
+        <div class="metric-value text-cyan" id="metricConnections">0</div>
+        <div class="metric-sub" id="metricTotalSessions">0 total sessions</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Active Rooms</div>
+        <div class="metric-value text-indigo" id="metricRooms">0</div>
+        <div class="metric-sub" id="metricRoomsList">No rooms</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Messages In / Out</div>
+        <div class="metric-value text-emerald">
+          <span id="metricMsgIn">0</span> / <span id="metricMsgOut">0</span>
+        </div>
+        <div class="metric-sub" id="metricRate">0 msg/sec</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Roundtrip Latency</div>
+        <div class="metric-value text-purple" id="metricLatency">-- ms</div>
+        <div class="metric-sub" id="metricUptime">Uptime: 0s</div>
+      </div>
+    </div>
+
+    <!-- View Mode Tabs -->
+    <div class="tabs-header">
+      <button class="tab-btn active" data-tab="tab-console">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        Live WebSocket Console & Tester
+      </button>
+      <button class="tab-btn" data-tab="tab-docs">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        Interactive API & Architecture Docs
+      </button>
+      <button class="tab-btn" data-tab="tab-bench">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        High-Throughput Burst Generator
+      </button>
+    </div>
+
+    <!-- TAB 1: CONSOLE & LIVE STREAM -->
+    <div id="tab-console" class="tab-content active">
+      <div class="grid-2col">
+        <!-- Left Panel: Controls & Rooms -->
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Session & Channel Controls</h3>
+          </div>
+          <div class="panel-body">
+            <!-- Client Identity Form -->
+            <div class="form-group">
+              <label for="inputNickname">Client Nickname</label>
+              <div class="input-with-button">
+                <input type="text" id="inputNickname" class="form-input" placeholder="e.g. Alice" value="Trader-Alpha">
+                <button id="btnUpdateNick" class="btn btn-outline btn-sm">Set</button>
+              </div>
+            </div>
+
+            <!-- Rooms Management -->
+            <div class="form-group">
+              <label>Room Subscription</label>
+              <div class="room-chips" id="roomChips">
+                <span class="chip active" data-room="crypto-ticks">📈 crypto-ticks</span>
+                <span class="chip" data-room="telemetry">⚡ telemetry</span>
+                <span class="chip" data-room="general">💬 general</span>
+                <span class="chip" data-room="system-alerts">🚨 system-alerts</span>
+              </div>
+              <div class="input-with-button mt-2">
+                <input type="text" id="inputCustomRoom" class="form-input" placeholder="Join custom room...">
+                <button id="btnJoinRoom" class="btn btn-secondary btn-sm">Join</button>
+                <button id="btnLeaveRoom" class="btn btn-danger btn-sm">Leave</button>
+              </div>
+            </div>
+
+            <!-- Outbound Message Composer -->
+            <div class="form-group">
+              <label for="selectAction">Action Type</label>
+              <select id="selectAction" class="form-select">
+                <option value="broadcast">broadcast (Room/Global)</option>
+                <option value="direct_msg">direct_msg (P2P Client)</option>
+                <option value="ping">ping (Heartbeat check)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="groupTargetId" style="display:none;">
+              <label for="inputTargetId">Target Client / Session ID</label>
+              <input type="text" id="inputTargetId" class="form-input" placeholder="UUID or Session ID">
+            </div>
+
+            <div class="form-group">
+              <label for="jsonPayload">JSON Payload Data</label>
+              <textarea id="jsonPayload" class="form-textarea" rows="4">{
+  "message": "Hello from Fickle client!",
+  "importance": "high"
+}</textarea>
+            </div>
+
+            <div class="action-buttons">
+              <button id="btnSendFrame" class="btn btn-primary w-full">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                Send Frame
+              </button>
+              <button id="btnQuickPing" class="btn btn-outline">Ping</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Panel: Real-Time Stream Viewer -->
+        <div class="panel">
+          <div class="panel-header flex-between">
+            <div class="flex-row">
+              <h3>Live Frame Stream</h3>
+              <span class="badge" id="streamCounter">0 frames</span>
+            </div>
+            <div class="flex-row gap-sm">
+              <label class="switch-label">
+                <input type="checkbox" id="chkAutoScroll" checked> Auto-scroll
+              </label>
+              <button id="btnClearStream" class="btn btn-ghost btn-xs">Clear</button>
+            </div>
+          </div>
+          <div class="panel-body stream-container" id="streamFeed">
+            <div class="stream-placeholder">
+              <p>Click "Connect" to open WebSocket connection and stream events.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: INTERACTIVE API & ARCHITECTURE DOCS -->
+    <div id="tab-docs" class="tab-content">
+      <div class="docs-layout">
+        <!-- Architecture Overview Card -->
+        <div class="doc-card">
+          <h2>📐 Architecture & Concurrency Topology</h2>
+          <p>
+            Fickle is engineered as a zero-copy, highly concurrent WebSocket hub in Go. Each client manages decoupled
+            <code>readPump</code> and <code>writePump</code> goroutines connected via buffered channels with write coalescing and automatic backpressure defense.
+          </p>
+
+          <div class="ascii-diagram">
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           HORIZONTAL CLUSTER ARCHITECTURE                       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+        Client A                               Client B
+           │ (WebSocket)                          │ (WebSocket)
+           ▼                                      ▼
+    ┌──────────────┐                       ┌──────────────┐
+    │ Fickle Node 1│                       │ Fickle Node 2│
+    │  (Port 8080) │                       │  (Port 8081) │
+    └──────┬───────┘                       └──────┬───────┘
+           │                                      │
+           │ (Redis Pub/Sub: fickle:broadcast)    │
+           └──────────────────┬───────────────────┘
+                              ▼
+                     ┌──────────────────┐
+                     │ Redis Pub/Sub Hub│
+                     │  (Message Sync)  │
+                     └──────────────────┘
+          </div>
+
+          <h3>Core Concurrency Model</h3>
+          <ul class="feature-list">
+            <li><strong>Decoupled Goroutines:</strong> Dedicated <code>writePump</code> prevents slow network writes from stalling the event loop.</li>
+            <li><strong>Write Coalescing:</strong> If multiple messages are queued in <code>send chan</code>, they are flushed in a single network frame, reducing syscalls under peak load.</li>
+            <li><strong>Thread-Safe Mutex Guards:</strong> Atomic session registry and fast read-write mutexes (<code>sync.RWMutex</code>) for room subscriber lookups.</li>
+            <li><strong>Redis Multi-Node Sync:</strong> Automatic fanout across cluster instances with origin node filtering to prevent infinite echo loops.</li>
+            <li><strong>Request Tracing:</strong> Injects end-to-end <code>trace_id</code> into JSON logs and frame headers for distributed observability.</li>
+          </ul>
+        </div>
+
+        <!-- WebSocket Protocol Specification -->
+        <div class="doc-card">
+          <h2>⚡ WebSocket Frame Protocol</h2>
+          <p>Clients communicate with the server at <code>ws://host:port/ws</code> using structured JSON frames:</p>
+
+          <div class="protocol-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Direction</th>
+                  <th>Required Fields</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>join_room</code></td>
+                  <td>Client ➔ Server</td>
+                  <td><code>action, room</code></td>
+                  <td>Subscribes connection to a specific broadcast channel</td>
+                </tr>
+                <tr>
+                  <td><code>leave_room</code></td>
+                  <td>Client ➔ Server</td>
+                  <td><code>action, room</code></td>
+                  <td>Unsubscribes from the specified room</td>
+                </tr>
+                <tr>
+                  <td><code>broadcast</code></td>
+                  <td>Client ➔ Server</td>
+                  <td><code>action, data</code> (room optional)</td>
+                  <td>Broadcasts message to room members or globally; syncs over Redis</td>
+                </tr>
+                <tr>
+                  <td><code>direct_msg</code></td>
+                  <td>Client ➔ Server</td>
+                  <td><code>action, target_id, data</code></td>
+                  <td>Point-to-point delivery to a specific client/session ID</td>
+                </tr>
+                <tr>
+                  <td><code>ping</code></td>
+                  <td>Client ➔ Server</td>
+                  <td><code>action</code></td>
+                  <td>Application-level heartbeat request (server returns <code>pong</code>)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Example Inbound Frame</h3>
+          <pre class="code-block"><code>{
+  "action": "broadcast",
+  "room": "crypto-ticks",
+  "data": { "symbol": "BTC/USDT", "signal": "BUY", "volume": 142.5 },
+  "trace_id": "a90b6ec6-3684-48f5-93df-499346617bb4"
+}</code></pre>
+
+          <h3>Example Outbound Envelope</h3>
+          <pre class="code-block"><code>{
+  "type": "message",
+  "action": "broadcast",
+  "room": "crypto-ticks",
+  "sender": {
+    "id": "c1f7b7e6-72be-4977-9430-6644f14188b8",
+    "nickname": "Trader-Alpha",
+    "session_id": "4ddca12a-4db5-4b4d-be78-2d88194a8220"
+  },
+  "data": { ... },
+  "trace_id": "a90b6ec6-3684-48f5-93df-499346617bb4",
+  "node_id": "fickle-node-1",
+  "timestamp": 1729221500000
+}</code></pre>
+        </div>
+
+        <!-- REST API Reference -->
+        <div class="doc-card">
+          <h2>🌐 REST Management Endpoints</h2>
+          <div class="endpoint-item">
+            <div class="endpoint-badge get">GET</div>
+            <div class="endpoint-url">/healthz</div>
+            <div class="endpoint-desc">Health probe returning uptime, active connections, and Redis status.</div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-badge get">GET</div>
+            <div class="endpoint-url">/api/v1/metrics</div>
+            <div class="endpoint-desc">Operational telemetry: msgs in/out, active rooms, total sessions.</div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-badge get">GET</div>
+            <div class="endpoint-url">/api/v1/rooms</div>
+            <div class="endpoint-desc">List of all active rooms with client membership counts.</div>
+          </div>
+          <div class="endpoint-item">
+            <div class="endpoint-badge post">POST</div>
+            <div class="endpoint-url">/api/v1/broadcast</div>
+            <div class="endpoint-desc">External webhook endpoint to publish frames into any WebSocket room.</div>
+          </div>
+
+          <h3>cURL Integration Example</h3>
+          <pre class="code-block"><code>curl -X POST http://localhost:8080/api/v1/broadcast \
+  -H "Content-Type: application/json" \
+  -H "X-Request-ID: $(uuidgen)" \
+  -d '{"room":"crypto-ticks","data":{"symbol":"SOL/USDT","price":198.40}}'</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: HIGH-THROUGHPUT BURST GENERATOR -->
+    <div id="tab-bench" class="tab-content">
+      <div class="doc-card">
+        <h2>🚀 High-Throughput Burst & Stress Generator</h2>
+        <p>
+          Simulate high-concurrency client load directly from your browser to test server throughput, channel buffering,
+          and Redis synchronization!
+        </p>
+
+        <div class="burst-controls">
+          <div class="form-group">
+            <label>Burst Rate: <span id="rateLabel" class="text-cyan">20 messages / sec</span></label>
+            <input type="range" id="rateSlider" min="5" max="100" value="20" step="5" class="form-range">
+          </div>
+
+          <div class="form-group">
+            <label for="selectBurstRoom">Target Room</label>
+            <select id="selectBurstRoom" class="form-select">
+              <option value="crypto-ticks">crypto-ticks</option>
+              <option value="telemetry">telemetry</option>
+              <option value="general">general</option>
+            </select>
+          </div>
+
+          <div class="burst-actions">
+            <button id="btnStartBurst" class="btn btn-primary">Start High-Rate Burst</button>
+            <button id="btnStopBurst" class="btn btn-danger" disabled>Stop Burst</button>
+          </div>
+        </div>
+
+        <div class="burst-metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Burst Frames Dispatched</div>
+            <div class="metric-value text-cyan" id="burstSentCount">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Acks / Echoes Received</div>
+            <div class="metric-value text-emerald" id="burstRecvCount">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Measured Delivery Rate</div>
+            <div class="metric-value text-purple" id="burstRateDisplay">0 msg/s</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p>Fickle High-Performance Reactive WebSocket Hub • Built with Go 1.25, gorilla/websocket, and Redis Pub/Sub</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

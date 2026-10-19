@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: fickle-websocket-hub
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: LOG_LEVEL
+        value: INFO
+      - key: REDIS_ADDR
+        fromService:
+          type: redis
+          name: fickle-redis
+          property: hostport
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: fickle-redis
+          property: password
+
+  - type: redis
+    name: fickle-redis
+    plan: free
+    region: oregon
+    ipAllowList: [] # internal access only

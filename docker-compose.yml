@@ -1,0 +1,67 @@
+services:
+  # =========================================================================
+  # Redis Pub/Sub Backbone for Multi-Node Cluster Synchronization
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: fickle-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - fickle-net
+
+  # =========================================================================
+  # Fickle WebSocket Node 1
+  # =========================================================================
+  fickle-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fickle-node-1
+    environment:
+      - PORT=8080
+      - NODE_ID=fickle-node-1
+      - REDIS_ADDR=redis:6379
+      - REDIS_CHANNEL=fickle:pubsub:broadcast
+      - LOG_LEVEL=INFO
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - fickle-net
+    restart: unless-stopped
+
+  # =========================================================================
+  # Fickle WebSocket Node 2 (Proves Horizontal Scale & Multi-Node Sync)
+  # =========================================================================
+  fickle-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fickle-node-2
+    environment:
+      - PORT=8080
+      - NODE_ID=fickle-node-2
+      - REDIS_ADDR=redis:6379
+      - REDIS_CHANNEL=fickle:pubsub:broadcast
+      - LOG_LEVEL=INFO
+    ports:
+      - "8081:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - fickle-net
+    restart: unless-stopped
+
+networks:
+  fickle-net:
+    driver: bridge
