@@ -234,10 +234,17 @@ func (h *Hub) HandleInbound(ctx context.Context, client *Client, p models.Inboun
 		}
 
 		if p.Room != "" {
-			h.BroadcastToRoom(ctx, p.Room, envelope, client, true)
+			if !client.IsSubscribed(p.Room) {
+				h.JoinRoom(client, p.Room)
+			}
+			h.BroadcastToRoom(ctx, p.Room, envelope, nil, true)
 		} else {
-			h.BroadcastGlobal(ctx, envelope, client, true)
+			h.BroadcastGlobal(ctx, envelope, nil, true)
 		}
+		log.Info("Broadcast message dispatched",
+			slog.String("room", p.Room),
+			slog.String("client_id", client.ID()),
+			slog.String("trace_id", p.TraceID))
 
 	case models.ActionDirect:
 		if p.TargetID == "" {

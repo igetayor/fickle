@@ -93,12 +93,19 @@
     btnUpdateNick.addEventListener('click', () => {
       const nick = inputNickname.value.trim();
       if (!nick) return;
-      sendFrame({
+      const sent = sendFrame({
         action: 'broadcast',
         room: currentRoom,
         nickname: nick,
         data: { message: `Nickname updated to ${nick}` }
       });
+      if (sent) {
+        const origText = btnUpdateNick.textContent;
+        btnUpdateNick.textContent = 'Saved ✓';
+        setTimeout(() => {
+          btnUpdateNick.textContent = origText;
+        }, 800);
+      }
     });
 
     // Room chip clicks
@@ -127,12 +134,19 @@
 
     btnSendFrame.addEventListener('click', () => {
       const action = selectAction.value;
+      const rawText = jsonPayload.value.trim();
       let data = {};
-      try {
-        data = JSON.parse(jsonPayload.value);
-      } catch (err) {
-        alert('Invalid JSON in payload data area: ' + err.message);
-        return;
+      if (rawText) {
+        if (rawText.startsWith('{') || rawText.startsWith('[')) {
+          try {
+            data = JSON.parse(rawText);
+          } catch (err) {
+            alert('Invalid JSON in payload data area: ' + err.message);
+            return;
+          }
+        } else {
+          data = { message: rawText };
+        }
       }
 
       const frame = {
@@ -149,12 +163,28 @@
         }
       }
 
-      sendFrame(frame);
+      const sent = sendFrame(frame);
+      if (sent) {
+        const origHTML = btnSendFrame.innerHTML;
+        btnSendFrame.textContent = 'Sent ✓';
+        btnSendFrame.style.background = '#10b981';
+        setTimeout(() => {
+          btnSendFrame.innerHTML = origHTML;
+          btnSendFrame.style.background = '';
+        }, 800);
+      }
     });
 
     btnQuickPing.addEventListener('click', () => {
       lastPingTimestamp = performance.now();
-      sendFrame({ action: 'ping' });
+      const sent = sendFrame({ action: 'ping' });
+      if (sent) {
+        const origText = btnQuickPing.textContent;
+        btnQuickPing.textContent = 'Pinging...';
+        setTimeout(() => {
+          btnQuickPing.textContent = origText;
+        }, 800);
+      }
     });
 
     btnClearStream.addEventListener('click', () => {
