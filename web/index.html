@@ -61,32 +61,23 @@
         <div class="metric-value text-emerald">
           <span id="metricMsgIn">0</span> / <span id="metricMsgOut">0</span>
         </div>
-        <div class="metric-sub" id="metricRate">0 msg/sec</div>
+        <div class="metric-sub" id="metricRate">0.0 msgs/sec</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">Roundtrip Latency</div>
-        <div class="metric-value text-purple" id="metricLatency">-- ms</div>
-        <div class="metric-sub" id="metricUptime">Uptime: 0s</div>
+        <div class="metric-label">Cluster Mode</div>
+        <div class="metric-value text-purple" id="metricClusterMode">Redis Pub/Sub</div>
+        <div class="metric-sub">Multi-Node Sync Enabled</div>
       </div>
     </div>
 
-    <!-- View Mode Tabs -->
-    <div class="tabs-header">
-      <button class="tab-btn active" data-tab="tab-console">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-        Live WebSocket Console & Tester
-      </button>
-      <button class="tab-btn" data-tab="tab-docs">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        Interactive API & Architecture Docs
-      </button>
-      <button class="tab-btn" data-tab="tab-bench">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-        High-Throughput Burst Generator
-      </button>
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+      <button class="tab-button active" data-tab="tab-console">Live Terminal & Controls</button>
+      <button class="tab-button" data-tab="tab-docs">Architecture & Protocol</button>
+      <button class="tab-button" data-tab="tab-bench">High-Throughput Burst Test</button>
     </div>
 
-    <!-- TAB 1: CONSOLE & LIVE STREAM -->
+    <!-- TAB 1: LIVE CONSOLE -->
     <div id="tab-console" class="tab-content active">
       <div class="grid-2col">
         <!-- Left Panel: Controls & Rooms -->
@@ -138,45 +129,42 @@
             <div class="form-group">
               <label for="jsonPayload">JSON Payload Data</label>
               <textarea id="jsonPayload" class="form-textarea" rows="4">{
-  "message": "Hello from Fickle client!",
-  "importance": "high"
+  "text": "Hello Fickle Cluster!",
+  "volume": 42.5,
+  "confidence": 0.99
 }</textarea>
             </div>
 
-            <div class="action-buttons">
-              <button id="btnSendFrame" class="btn btn-primary w-full">
+            <div class="form-actions">
+              <button id="btnSendMessage" class="btn btn-primary" style="width:100%;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                Send Frame
+                Send WebSocket Frame
               </button>
-              <button id="btnQuickPing" class="btn btn-outline">Ping</button>
             </div>
           </div>
         </div>
 
-        <!-- Right Panel: Real-Time Stream Viewer -->
+        <!-- Right Panel: Real-time Message Stream -->
         <div class="panel">
-          <div class="panel-header flex-between">
-            <div class="flex-row">
-              <h3>Live Frame Stream</h3>
-              <span class="badge" id="streamCounter">0 frames</span>
-            </div>
-            <div class="flex-row gap-sm">
-              <label class="switch-label">
-                <input type="checkbox" id="chkAutoScroll" checked> Auto-scroll
+          <div class="panel-header">
+            <h3>Live Inbound / Outbound Stream</h3>
+            <div class="panel-header-actions">
+              <label class="checkbox-label">
+                <input type="checkbox" id="chkAutoScroll" checked> Auto-Scroll
               </label>
-              <button id="btnClearStream" class="btn btn-ghost btn-xs">Clear</button>
+              <button id="btnClearStream" class="btn btn-outline btn-xs">Clear</button>
             </div>
           </div>
-          <div class="panel-body stream-container" id="streamFeed">
-            <div class="stream-placeholder">
-              <p>Click "Connect" to open WebSocket connection and stream events.</p>
+          <div class="panel-body p-0">
+            <div id="messageStream" class="stream-container">
+              <!-- Dynamically populated stream items -->
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- TAB 2: INTERACTIVE API & ARCHITECTURE DOCS -->
+    <!-- TAB 2: ARCHITECTURE & PROTOCOL DOCS -->
     <div id="tab-docs" class="tab-content">
       <div class="docs-layout">
         <!-- Architecture Overview Card -->
@@ -187,10 +175,10 @@
             <code>readPump</code> and <code>writePump</code> goroutines connected via buffered channels with write coalescing and automatic backpressure defense.
           </p>
 
-          <div class="ascii-diagram">
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           HORIZONTAL CLUSTER ARCHITECTURE                       │
-└─────────────────────────────────────────────────────────────────────────────────┘
+          <pre class="ascii-diagram">
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           HORIZONTAL CLUSTER ARCHITECTURE                   │
+└─────────────────────────────────────────────────────────────────────────────┘
         Client A                               Client B
            │ (WebSocket)                          │ (WebSocket)
            ▼                                      ▼
@@ -206,7 +194,7 @@
                      │ Redis Pub/Sub Hub│
                      │  (Message Sync)  │
                      └──────────────────┘
-          </div>
+          </pre>
 
           <h3>Core Concurrency Model</h3>
           <ul class="feature-list">
@@ -236,31 +224,31 @@
               <tbody>
                 <tr>
                   <td><code>join_room</code></td>
-                  <td>Client ➔ Server</td>
+                  <td>Client → Server</td>
                   <td><code>action, room</code></td>
                   <td>Subscribes connection to a specific broadcast channel</td>
                 </tr>
                 <tr>
                   <td><code>leave_room</code></td>
-                  <td>Client ➔ Server</td>
+                  <td>Client → Server</td>
                   <td><code>action, room</code></td>
                   <td>Unsubscribes from the specified room</td>
                 </tr>
                 <tr>
                   <td><code>broadcast</code></td>
-                  <td>Client ➔ Server</td>
+                  <td>Client → Server</td>
                   <td><code>action, data</code> (room optional)</td>
                   <td>Broadcasts message to room members or globally; syncs over Redis</td>
                 </tr>
                 <tr>
                   <td><code>direct_msg</code></td>
-                  <td>Client ➔ Server</td>
+                  <td>Client → Server</td>
                   <td><code>action, target_id, data</code></td>
                   <td>Point-to-point delivery to a specific client/session ID</td>
                 </tr>
                 <tr>
                   <td><code>ping</code></td>
-                  <td>Client ➔ Server</td>
+                  <td>Client → Server</td>
                   <td><code>action</code></td>
                   <td>Application-level heartbeat request (server returns <code>pong</code>)</td>
                 </tr>
@@ -379,5 +367,6 @@
   </footer>
 
   <script src="app.js"></script>
+  <script src="web/app.js"></script>
 </body>
 </html>
