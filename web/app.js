@@ -288,7 +288,16 @@
 
   function sendFrame(frame) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      alert('WebSocket is not connected. Please click "Connect" first.');
+      connectWS();
+      // Try again after a short delay
+      setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          frame.trace_id = crypto.randomUUID ? crypto.randomUUID() : 'trc-' + Math.random().toString(36).substring(2, 9);
+          ws.send(JSON.stringify(frame));
+        } else {
+          alert('Connecting to WebSocket at ' + getWsUrl() + '... Please ensure backend is running at http://localhost:8080 and click "Connect".');
+        }
+      }, 300);
       return false;
     }
     frame.trace_id = crypto.randomUUID ? crypto.randomUUID() : 'trc-' + Math.random().toString(36).substring(2, 9);
