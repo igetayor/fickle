@@ -288,6 +288,7 @@
 
   function sendFrame(frame) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+
       connectWS();
       // Try again after a short delay
       setTimeout(() => {
